@@ -1,0 +1,16 @@
+timestamp: 2026-05-28 02:13:29
+python: 3.12.3
+executable: /root/miniconda3/bin/python
+cmdline: main.py --model densenet --mode all --epochs 25 --data_root /root/autodl-tmp/data/appa-real-release --out_dir /root/autodl-tmp/work/results --ckpt_dir /root/autodl-tmp/work/checkpoints --seed 42
+cwd: /root/CV-Course-Age-Estimation
+torch: 2.5.1+cu124
+torch.cuda.is_available: True
+torch.version.cuda: 12.4
+cudnn: 90100
+gpu_count: 1
+gpu[0]: NVIDIA A800 80GB PCIe
+git_rev: 6d40b0b665cf31fe46fcd1f1dc4a92608a8e82d8
+git_dirty: no
+model: densenet
+mode: all
+config_path: configs/densenet.yaml
