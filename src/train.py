@@ -131,7 +131,6 @@ def run_training(
     cfg: Dict[str, Any],
     train_loader: DataLoader,
     val_loader: DataLoader,
-    test_loader: DataLoader,  # carried through for symmetry; not used here
     device: torch.device,
     out_dir: str,
     ckpt_dir: str,
@@ -140,7 +139,6 @@ def run_training(
 
     Returns (best_val_mae, history_df, best_ckpt_path).
     """
-    del test_loader  # explicitly unused here; test happens in eval module
     ensure_dir(out_dir)
     ensure_dir(ckpt_dir)
 

@@ -143,13 +143,17 @@ def gpu_mem_peak_mb() -> float:
 # Factories (optimizer / scheduler / criterion)
 # --------------------------------------------------------------------------- #
 def build_criterion(cfg: Dict[str, Any]) -> nn.Module:
-    """Build loss. Fair-experiment requirement: only L1 is supported here."""
+    """Build loss from cfg. L1 is the default for the fair-experiment protocol;
+    MSE and SmoothL1 are also supported for ablation runs (the protocol is
+    enforced at the config layer, not here)."""
     name = str(cfg.get("loss", "l1")).lower()
     if name == "l1":
         return nn.L1Loss()
-    raise ValueError(
-        f"Unsupported loss '{name}'. The fair-experiment protocol requires L1."
-    )
+    if name == "mse":
+        return nn.MSELoss()
+    if name in ("smooth_l1", "smoothl1", "huber"):
+        return nn.SmoothL1Loss()
+    raise ValueError(f"Unknown loss '{name}'. Allowed: l1, mse, smooth_l1.")
 
 
 def build_optimizer(model: nn.Module, cfg: Dict[str, Any]) -> torch.optim.Optimizer:

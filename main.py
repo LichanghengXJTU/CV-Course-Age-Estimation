@@ -122,7 +122,6 @@ def main() -> None:
             cfg=cfg,
             train_loader=train_loader,
             val_loader=val_loader,
-            test_loader=test_loader,
             device=device,
             out_dir=model_out_dir,
             ckpt_dir=ckpt_dir,
