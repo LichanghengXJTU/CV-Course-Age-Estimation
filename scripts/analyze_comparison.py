@@ -300,6 +300,56 @@ YAML configs.
     (OUT / "comparison_summary.md").write_text(md)
 
 
+def sanity_check_collapse(data) -> int:
+    """Flag any model whose predictions look degenerate (mean-collapse).
+
+    Returns the number of models flagged. The default behavior is just to
+    print; in CI you could turn it into a non-zero exit if needed.
+    """
+    issues = []
+    for m in MODELS:
+        pred = data[m]["pred"]
+        gt = data[m]["gt"]
+        mae = float(np.mean(np.abs(pred - gt)))
+        baseline_mae = float(np.mean(np.abs(gt - gt.mean())))
+        r = float(np.corrcoef(pred, gt)[0, 1])
+        pred_std = float(pred.std())
+        gt_std = float(gt.std())
+        ratio = pred_std / gt_std if gt_std > 0 else 0.0
+
+        flags = []
+        # Narrow prediction range (collapsed to a few values)
+        if ratio < 0.25:
+            flags.append(
+                f"pred_std/gt_std = {ratio:.3f} < 0.25 (predictions are too narrow)"
+            )
+        # Weak rank correlation — model doesn't sort samples by gt
+        if r < 0.4:
+            flags.append(f"Pearson r = {r:.3f} < 0.4 (predictions barely correlate with gt)")
+        # MAE not meaningfully better than constant predictor
+        if mae > 0.95 * baseline_mae:
+            flags.append(
+                f"MAE {mae:.3f} is within 5% of predict-mean baseline {baseline_mae:.3f}"
+            )
+        if flags:
+            issues.append((LABELS[m], flags))
+
+    print("\n=== sanity check: mean-collapse / degeneracy flags ===")
+    if not issues:
+        print("All models look healthy (none flagged).")
+        return 0
+    for model_label, flags in issues:
+        print(f"[WARNING] {model_label}: possible mean-collapse")
+        for f in flags:
+            print(f"  - {f}")
+    print(
+        "\nIf you see flags above, do NOT report MAE/RMSE as if the model is "
+        "doing meaningful regression — verify with pred_distribution.png and "
+        "per-age-group MAE before drawing architecture-level conclusions."
+    )
+    return len(issues)
+
+
 def main():
     data = load_all()
     plot_mae_curves(data)
@@ -311,6 +361,7 @@ def main():
     write_markdown_summary(data, table)
     print("=== comparison_table.csv ===")
     print(table.to_string(index=False))
+    sanity_check_collapse(data)
     print()
     print(f"All artifacts saved under {OUT}")
 
