@@ -1,0 +1,20 @@
+model: vit_b_16
+pretrained: true
+epochs: 50
+batch_size: 16
+lr: 0.0002
+weight_decay: 0.01
+optimizer: adamw
+loss: l1
+llrd: true
+llrd_decay: 0.75
+llrd_n_blocks: 12
+scheduler:
+  name: cosine_warmup
+  warmup_epochs: 5
+  warmup_start_factor: 0.01
+  t_max: 50
+  eta_min: 3.0e-07
+img_size: 224
+num_workers: 4
+seed: 42
