@@ -52,10 +52,13 @@
 - **标签语义**：使用 `apparent_age_avg` 字段，即多名标注者对同一张人脸图像给出的
   表观年龄（apparent age）的平均值。表观年龄是连续实数，与生物学年龄略有偏差，
   但其连续性使得回归建模天然适用。
-- **Split**：直接使用官方的 train / valid / test 划分，未做任何重切分。测试集大小
-  从两个模型的 `test_summary.txt` 得到一致结果：**n_test = 1978**。训练集大致
-  约 3800-3900 张（drop_last 后从 step_log.csv 可推算每个 epoch 训练步数为
-  DN=121 步 × bs=32 ≈ 3872、ViT=241 步 × bs=16 ≈ 3856）。
+- **Split 与样本数**：直接使用官方的 train / valid / test 划分，未做任何重切分。
+  样本数取自 `gt_avg_<split>.csv` 的有效行数（去 header）：
+  **train = 4113，valid = 1500，test = 1978，合计 7591 张**。注意训练时
+  `DataLoader` 启用 `drop_last=True`，每个 epoch 实际过 `floor(4113/bs) × bs`
+  张（DenseNet 128 步 × 32 = 4096；ViT 257 步 × 16 = 4112），少量样本被当前
+  epoch 跳过，但 25 个 epoch 之间随机打乱会让训练集整体覆盖到位，无系统偏差。
+  `step_log.csv` 仅按 20 步采样一次，**不可用于反推训练集大小**。
 - **Ignore list**：dataset 模块支持 `ignore_list.csv` 自动剔除标注质量差的样本
   （见 `src/dataset.py`）。
 - **年龄分布**：测试集按年龄分箱后呈典型长尾分布，[20, 30) 年龄段占 579 样本（29%），
@@ -273,6 +276,11 @@ test_loss, test_mae, test_rmse, preds, gts, names = evaluate(test_loader, return
 | mean epoch time (s) | 9.31 | 35.93 |
 | GPU peak memory (MB) | 4122.58 | 2989.81 |
 
+上表中的 **best epoch** 是按**验证集 MAE 最低**选出的，对应的
+`<model>_best.pth` checkpoint 即为 test 评估所用模型。
+因此 §9.1 报出的 test MAE / RMSE 反映的是各模型在 25 个 epoch 中
+**验证集上最强**的那一版的泛化表现，而非最后一个 epoch 的表现。
+
 观察：
 
 - DenseNet 在 test 上达到 MAE ≈ 5.06、RMSE ≈ 7.19，是一个合理的基线。
@@ -384,7 +392,7 @@ ViT 时间成本显著更高，但显存反而更省。
 
 这一现象**不是 bug**，而是 ViT 在该数据规模下表征能力的真实反映：
 
-1. **样本量不足**：APPA-REAL 训练集仅 ~3800 张，是 ImageNet
+1. **样本量不足**：APPA-REAL 训练集仅 4113 张，是 ImageNet
    的约 1/300。Dosovitskiy et al. 2021 的原论文明确指出
    ViT 的表现强依赖训练 / 预训练数据规模；在小数据上 fine-tune 不足以让
    self-attention 学到可靠的年龄相关模式。
@@ -476,6 +484,6 @@ DenseNet 在 [0, 10)、[20, 30) 段已经接近这个下限，
 
 ### 12.4 一句话总结
 
-在 APPA-REAL 这种 "~7600 张样本 + 长尾年龄分布" 的中小规模回归任务上，
+在 APPA-REAL 这种 "7591 张样本 + 长尾年龄分布" 的中小规模回归任务上，
 DenseNet 凭借局部卷积归纳偏置稳定胜出；ViT 在主峰区段表现尚可，
 但在尾部完全塌缩，体现了 Transformer 对训练数据规模与归纳偏置的强依赖。
