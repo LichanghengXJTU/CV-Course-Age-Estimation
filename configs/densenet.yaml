@@ -1,0 +1,15 @@
+model: densenet121
+pretrained: true
+epochs: 25
+batch_size: 32
+lr: 1.0e-4
+weight_decay: 0.0
+optimizer: adam
+loss: l1
+scheduler:
+  name: step
+  step_size: 10
+  gamma: 0.5
+img_size: 224
+num_workers: 4
+seed: 42

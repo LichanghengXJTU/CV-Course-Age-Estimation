@@ -1,0 +1,27 @@
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+env/
+.ipynb_checkpoints/
+.DS_Store
+
+# Data not in git
+data/*
+!data/.gitkeep
+
+# Model weights not in git
+checkpoints/*.pth
+checkpoints/*.pt
+!checkpoints/.gitkeep
+
+# Result artifacts (large) not in git, but keep dir
+results/*.png
+results/*.jpg
+results/*.npy
+!results/.gitkeep
+
+# Logs
+logs/
+*.log
