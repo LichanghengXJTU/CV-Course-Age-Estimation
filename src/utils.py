@@ -156,19 +156,91 @@ def build_criterion(cfg: Dict[str, Any]) -> nn.Module:
     raise ValueError(f"Unknown loss '{name}'. Allowed: l1, mse, smooth_l1.")
 
 
+def _vit_param_depth(name: str, n_blocks: int = 12) -> int:
+    """Return LLRD depth for a torchvision ViT-B param name.
+
+    Depth 0 = closest to output (head, final LayerNorm) -> highest lr.
+    Depth n_blocks+1 = embeddings -> lowest lr (base_lr * decay^(n_blocks+1)).
+    """
+    if "heads" in name:
+        return 0
+    if name.startswith("encoder.ln"):
+        return 0
+    if "encoder.layers.encoder_layer_" in name:
+        idx = int(name.split("encoder_layer_")[1].split(".")[0])
+        return n_blocks - idx  # block_{n-1} -> 1, block_0 -> n
+    # conv_proj (patch embed), encoder.pos_embedding, class_token, etc.
+    return n_blocks + 1
+
+
+def _build_param_groups_llrd(
+    model: nn.Module,
+    base_lr: float,
+    decay: float,
+    weight_decay: float,
+    n_blocks: int = 12,
+) -> list:
+    """Per-layer param groups for layer-wise LR decay on torchvision ViT-B/16.
+
+    - lr_i = base_lr * decay^depth_i
+    - LayerNorm / bias / class_token / pos_embedding params get weight_decay=0
+      (standard transformer convention).
+    """
+    groups: Dict = {}
+    for name, p in model.named_parameters():
+        if not p.requires_grad:
+            continue
+        depth = _vit_param_depth(name, n_blocks=n_blocks)
+        no_wd = (
+            name.endswith(".bias")
+            or "ln" in name.lower()
+            or "norm" in name.lower()
+            or name == "class_token"
+            or name.endswith("pos_embedding")
+        )
+        key = (depth, no_wd)
+        if key not in groups:
+            groups[key] = {
+                "params": [],
+                "lr": base_lr * (decay ** depth),
+                "weight_decay": 0.0 if no_wd else weight_decay,
+                "depth": depth,
+                "no_wd": no_wd,
+            }
+        groups[key]["params"].append(p)
+    return [groups[k] for k in sorted(groups.keys())]
+
+
 def build_optimizer(model: nn.Module, cfg: Dict[str, Any]) -> torch.optim.Optimizer:
-    """Build optimizer from cfg. Allowed: adam, adamw, sgd."""
+    """Build optimizer from cfg. Allowed: adam, adamw, sgd.
+
+    If `cfg['llrd']` is true, build per-layer param groups with decayed lr
+    (`llrd_decay` defaults 0.75, `llrd_n_blocks` defaults 12 for ViT-B/16).
+    """
     name = str(cfg.get("optimizer", "adam")).lower()
-    lr = float(cfg["lr"])
+    base_lr = float(cfg["lr"])
     wd = float(cfg.get("weight_decay", 0.0))
-    params = [p for p in model.parameters() if p.requires_grad]
+
+    if bool(cfg.get("llrd", False)):
+        decay = float(cfg.get("llrd_decay", 0.75))
+        n_blocks = int(cfg.get("llrd_n_blocks", 12))
+        param_groups = _build_param_groups_llrd(
+            model, base_lr, decay, wd, n_blocks=n_blocks
+        )
+    else:
+        param_groups = [{
+            "params": [p for p in model.parameters() if p.requires_grad],
+            "lr": base_lr,
+            "weight_decay": wd,
+        }]
+
     if name == "adam":
-        return torch.optim.Adam(params, lr=lr, weight_decay=wd)
+        return torch.optim.Adam(param_groups)
     if name == "adamw":
-        return torch.optim.AdamW(params, lr=lr, weight_decay=wd)
+        return torch.optim.AdamW(param_groups)
     if name == "sgd":
         momentum = float(cfg.get("momentum", 0.9))
-        return torch.optim.SGD(params, lr=lr, momentum=momentum, weight_decay=wd)
+        return torch.optim.SGD(param_groups, momentum=momentum)
     raise ValueError(f"Unknown optimizer '{name}'")
 
 
@@ -193,6 +265,29 @@ def build_scheduler(
         eta_min = float(sch.get("eta_min", 0.0))
         return torch.optim.lr_scheduler.CosineAnnealingLR(
             optimizer, T_max=t_max, eta_min=eta_min
+        )
+    if name == "cosine_warmup":
+        warmup_epochs = int(sch.get("warmup_epochs", 5))
+        t_max = int(sch.get("t_max", cfg.get("epochs", 50)))
+        eta_min = float(sch.get("eta_min", 0.0))
+        start_factor = float(sch.get("warmup_start_factor", 0.01))
+        # Phase 1: linear warmup from start_factor * lr to lr over warmup_epochs.
+        # Phase 2: cosine from lr down to eta_min over (t_max - warmup_epochs).
+        warmup = torch.optim.lr_scheduler.LinearLR(
+            optimizer,
+            start_factor=start_factor,
+            end_factor=1.0,
+            total_iters=max(1, warmup_epochs),
+        )
+        cosine = torch.optim.lr_scheduler.CosineAnnealingLR(
+            optimizer,
+            T_max=max(1, t_max - warmup_epochs),
+            eta_min=eta_min,
+        )
+        return torch.optim.lr_scheduler.SequentialLR(
+            optimizer,
+            schedulers=[warmup, cosine],
+            milestones=[warmup_epochs],
         )
     if name == "multistep":
         milestones = [int(m) for m in sch["milestones"]]

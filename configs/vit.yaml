@@ -1,14 +1,26 @@
 model: vit_b_16
 pretrained: true
-epochs: 25
+epochs: 50
 batch_size: 16
-lr: 5.0e-5
-weight_decay: 0.05
+# `lr` here is the BASE (head) lr; lower layers get base * 0.75^depth via LLRD.
+lr: 2.0e-4
+weight_decay: 0.01
 optimizer: adamw
 loss: l1
+# Layer-wise LR decay (LLRD) — standard ViT fine-tuning trick to give the
+# head a useable lr while keeping the pretrained backbone gently moving.
+llrd: true
+llrd_decay: 0.75
+llrd_n_blocks: 12
 scheduler:
-  name: cosine
-  t_max: 25
+  # Linear warmup from 0.01*lr to lr over `warmup_epochs`, then cosine to
+  # `eta_min` across the remainder. This avoids the dead first epochs we saw
+  # in the baseline run where the head exploded the optimizer.
+  name: cosine_warmup
+  warmup_epochs: 5
+  warmup_start_factor: 0.01
+  t_max: 50
+  eta_min: 3.0e-7
 img_size: 224
 num_workers: 4
 seed: 42
