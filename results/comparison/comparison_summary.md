@@ -33,8 +33,9 @@ All three runs at **50 epochs** to remove the budget-asymmetry confound.
 ## Recipe comparison
 
 - **DenseNet121**: torchvision pretrained, head replaced with `Linear(1024, 1)`,
-  Adam lr=1e-4, StepLR (γ=0.5 every 10 ep, so lr decays 5× over 50 ep ->
-  3.125e-6 final), weight_decay=0, batch_size=32, **50 epochs**, L1 loss.
+  Adam lr=1e-4, StepLR (γ=0.5 every 10 ep — triggers at ep 11/21/31/41
+  within 50 ep, so lr decays 4 times: 1e-4 -> 6.25e-6 final), weight_decay=0,
+  batch_size=32, **50 epochs**, L1 loss.
 - **ViT-B/16 (new, this run)**: torchvision pretrained, head replaced with
   `Linear(768, 1)`, AdamW base_lr=2e-4 at head with
   **LLRD (decay 0.75)** down to ~4.75e-6 at embedding, **linear warmup over
