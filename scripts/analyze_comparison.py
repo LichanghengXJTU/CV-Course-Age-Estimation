@@ -357,6 +357,111 @@ def sanity_check_collapse(data) -> int:
     return len(issues)
 
 
+def plot_budget_extension_curves():
+    """3-panel val_mae trajectory plot, one panel per model architecture.
+    Each panel overlays the available budget variants (25 / 50 / 100 ep).
+
+    This is the visualisation for §11.8 of the report — it makes the
+    non-monotonic-in-budget finding (50ep is sweet spot, 100ep regresses)
+    visually obvious. Separate from the §9-10 headline 50ep-canonical plots.
+    """
+    # (panel_label, list-of-(budget_label, results_dir, linestyle))
+    panels = [
+        ("DenseNet121", [
+            ("25 ep",            "densenet_25ep",       "--"),
+            ("50 ep (canonical)", "densenet",            "-"),
+            ("100 ep",           "densenet_100ep",      ":"),
+        ]),
+        ("ViT-B/16 (new recipe)", [
+            ("50 ep (canonical)", "vit",                 "-"),
+            ("100 ep",           "vit_100ep",           ":"),
+        ]),
+        ("ViT-B/16 (baseline recipe)", [
+            ("25 ep",            "vit_baseline_25ep",   "--"),
+            ("50 ep (canonical)", "vit_baseline",        "-"),
+            ("100 ep",           "vit_baseline_100ep",  ":"),
+        ]),
+    ]
+    panel_colors = {
+        "DenseNet121": "#1f77b4",
+        "ViT-B/16 (new recipe)": "#2ca02c",
+        "ViT-B/16 (baseline recipe)": "#d62728",
+    }
+
+    fig, axes = plt.subplots(1, 3, figsize=(16, 5), sharey=False)
+    for ax, (model_label, runs) in zip(axes, panels):
+        color = panel_colors[model_label]
+        for budget_label, sub, ls in runs:
+            d = RES / sub
+            if not d.is_dir():
+                continue
+            df = pd.read_csv(d / "epoch_log.csv")
+            ax.plot(df["epoch"], df["val_mae"],
+                    color=color, linestyle=ls, linewidth=2,
+                    label=budget_label)
+            # mark best epoch for this run
+            idx = df["val_mae"].idxmin()
+            ax.scatter([df.loc[idx, "epoch"]], [df.loc[idx, "val_mae"]],
+                       s=70, color=color, edgecolor="black", linewidth=0.8,
+                       zorder=5)
+        ax.set_xlabel("epoch")
+        ax.set_ylabel("val MAE (years)")
+        ax.set_title(model_label)
+        ax.grid(True, alpha=0.3)
+        ax.legend(fontsize=9, loc="upper right")
+        ax.set_xlim(0, 102)
+    fig.suptitle(
+        "Budget extension ablation — val MAE trajectories at 25 / 50 / 100 ep\n"
+        "(solid = 50ep canonical; dashed = 25ep; dotted = 100ep; dot = best epoch used for test)"
+    )
+    fig.tight_layout()
+    fig.savefig(OUT / "budget_extension_mae_curves.png", dpi=120)
+    plt.close(fig)
+
+
+def plot_budget_extension_per_age():
+    """Per-age MAE bar chart across budget variants for the ViT (baseline),
+    to make the 100ep tail-regression visible.
+
+    Three sets of bars (25 / 50 / 100 ep) per age bin, only for vit_baseline
+    where the budget effect is most dramatic. (DenseNet and ViT new are
+    flat across budgets — covered in the existing per_age_bar.png.)
+    """
+    bins_ref = pd.read_csv(RES / "vit_baseline" / "per_age_group_mae.csv")["bin"].values
+    counts = pd.read_csv(RES / "vit_baseline" / "per_age_group_mae.csv")["count"].values
+    x = np.arange(len(bins_ref))
+    width = 0.27
+
+    fig, (ax, ax2) = plt.subplots(2, 1, figsize=(11, 7), sharex=True,
+                                  gridspec_kw={"height_ratios": [3, 1]})
+    layers = [
+        ("25 ep (collapsed)", "vit_baseline_25ep",  "#ff9999"),
+        ("50 ep (canonical)", "vit_baseline",       "#d62728"),
+        ("100 ep (regressed)", "vit_baseline_100ep","#7f1d1d"),
+    ]
+    for i, (label, sub, color) in enumerate(layers):
+        df = pd.read_csv(RES / sub / "per_age_group_mae.csv")
+        offset = (i - 1) * width
+        ax.bar(x + offset, df["mae"].values, width, color=color, label=label)
+    ax.set_ylabel("MAE (years)")
+    ax.set_title(
+        "ViT (baseline recipe) — per-age-group test MAE across budget variants\n"
+        "25 ep is the mean-collapse run; 50 ep partial recovery; 100 ep tail-regression"
+    )
+    ax.grid(True, alpha=0.3, axis="y")
+    ax.legend(fontsize=9)
+
+    ax2.bar(x, counts, color="grey", alpha=0.7)
+    ax2.set_ylabel("# test samples")
+    ax2.set_xlabel("age group")
+    ax2.set_xticks(x)
+    ax2.set_xticklabels(bins_ref, rotation=20)
+    ax2.grid(True, alpha=0.3, axis="y")
+    fig.tight_layout()
+    fig.savefig(OUT / "budget_extension_baseline_per_age.png", dpi=120)
+    plt.close(fig)
+
+
 def write_budget_ablation():
     """Compare ViT baseline at 25ep vs 50ep, and DenseNet at 25ep vs 50ep,
     to isolate the budget-only contribution from the recipe contribution.
@@ -408,6 +513,9 @@ def main():
     plot_scatter(data)
     plot_per_age(data)
     plot_pred_distribution(data)
+    # New (2026-05-28 late): budget-extension ablation plots for §11.8
+    plot_budget_extension_curves()
+    plot_budget_extension_per_age()
     table = write_table(data)
     write_markdown_summary(data, table)
     budget = write_budget_ablation()

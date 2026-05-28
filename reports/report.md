@@ -594,6 +594,30 @@ test 结果与 50 / 25 ep 对照：
 
 三个模型 100 ep 都比 50 ep 退化，**50 ep 是 budget sweet spot**。
 
+![Budget extension val MAE trajectories](../results/comparison/budget_extension_mae_curves.png)
+
+三面板叠图展示了 budget 维度的实际轨迹（实线 = 50ep canonical，虚线 = 25ep，
+点线 = 100ep，圆点 = 各 run 按 val MAE 选出的 best epoch）：
+
+- **DenseNet (左)**：三条曲线在 ep 15 之后基本重合在 val MAE ≈ 4.2 平台上，
+  best epoch 由 25ep 的 22 推到 100ep 的 59，但 y 值几乎不变 —— 完全饱和。
+- **ViT (new, 中)**：50ep 与 100ep 曲线在 ep 5-50 完全重合（同一份 LLRD +
+  warmup 在前 50 ep 决定 trajectory），50 ep 之后 100ep 继续随 cosine 缓慢
+  下行但 val 不再改善，best epoch 从 50ep run 的 37 反而前移到 100ep run
+  的 34（同 trajectory 上的随机性挑选）。
+- **ViT (baseline, 右)**：U 形最清晰。50ep（实线）在 ep 25 之后陡降到
+  7.6 附近；100ep（点线）在前 25 ep 沿同一条 trajectory，但因为 cosine
+  `t_max` 被推到 100，中段持续高 lr → 模型反而停留在 val MAE ≈ 10 的
+  上方平台，到 ep 65 才取得 best 10.03，最终降幅远不及 50ep run 的 7.63。
+
+![Per-age MAE across baseline budget variants](../results/comparison/budget_extension_baseline_per_age.png)
+
+ViT (baseline) 在各年龄段上的 budget 影响：浅红 25ep（塌缩，整体偏高）、
+中红 50ep（**几乎所有桶都最低**）、深红 100ep（在 50ep 与 25ep 之间，
+[70, inf) 41.25、[60, 70) 25.94 显著回弹）。这印证了 §11.8 上文的判断：
+100 ep 把 50 ep 辛苦修复的尾部表征侵蚀回去，但还没退回 25 ep 的全面
+塌缩态 —— 这种"部分回退"才是 100 ep 在 baseline 上有害的根本表现。
+
 **逐模型读数**：
 
 1. **DenseNet 25→50→100：5.064 → 4.941 → 5.003**。25→50 之间还有
