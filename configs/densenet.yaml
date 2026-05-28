@@ -1,6 +1,6 @@
 model: densenet121
 pretrained: true
-epochs: 50
+epochs: 100
 batch_size: 32
 lr: 1.0e-4
 weight_decay: 0.0
