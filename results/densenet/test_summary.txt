@@ -1,0 +1,7 @@
+model: densenet
+ckpt: /root/autodl-tmp/work/checkpoints/densenet_best.pth
+best_epoch: 31
+test_loss: 4.940920
+test_mae: 4.940920
+test_rmse: 6.942903
+n_test: 1978

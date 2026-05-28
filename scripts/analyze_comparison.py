@@ -42,9 +42,9 @@ COLORS = {
     "vit_baseline": "#d62728",
 }
 LABELS = {
-    "densenet": "DenseNet121",
+    "densenet": "DenseNet121 (50ep)",
     "vit": "ViT-B/16 (LLRD+warmup, 50ep)",
-    "vit_baseline": "ViT-B/16 (default recipe, 25ep)",
+    "vit_baseline": "ViT-B/16 (default recipe, 50ep)",
 }
 
 
@@ -250,6 +250,8 @@ def write_markdown_summary(data, table_df):
     gap_vs_base = base_test - vit_test
     md = f"""# DenseNet vs ViT (new recipe) vs ViT (baseline recipe) — APPA-REAL
 
+All three runs at **50 epochs** to remove the budget-asymmetry confound.
+
 ## Final metrics (test, single seed=42)
 
 {chr(10).join(table_lines)}
@@ -261,8 +263,8 @@ def write_markdown_summary(data, table_df):
 ## Recipe comparison
 
 - **DenseNet121**: torchvision pretrained, head replaced with `Linear(1024, 1)`,
-  Adam lr=1e-4, StepLR (γ=0.5 every 10 ep), weight_decay=0, batch_size=32,
-  25 epochs, L1 loss.
+  Adam lr=1e-4, StepLR (γ=0.5 every 10 ep, so lr decays 5× over 50 ep ->
+  3.125e-6 final), weight_decay=0, batch_size=32, **50 epochs**, L1 loss.
 - **ViT-B/16 (new, this run)**: torchvision pretrained, head replaced with
   `Linear(768, 1)`, AdamW base_lr=2e-4 at head with
   **LLRD (decay 0.75)** down to ~4.75e-6 at embedding, **linear warmup over
@@ -270,32 +272,36 @@ def write_markdown_summary(data, table_df):
   **50 epochs**, L1 loss.
 - **ViT-B/16 (baseline)**: same backbone + head as the new run, but the
   default torchvision-style fine-tune recipe: AdamW lr=5e-5 flat across all
-  params (no LLRD), cosine to 0 (no warmup), weight_decay=0.05, 25 epochs.
+  params (no LLRD), cosine to η_min=0 (no warmup), weight_decay=0.05,
+  **50 epochs**, L1 loss.
 
-## Headline
+## Headline (at equal 50-epoch budget)
 
-- **ViT (new) slightly beats DenseNet** on this test set:
-  MAE {vit_test:.3f} vs {dn_test:.3f} (gap {gap_vs_dn:+.3f}), and wins in
-  5 / 8 age bins including both extreme tails ([0,10) and [70,∞)) that
-  DenseNet handles only moderately well.
-- **ViT (baseline) collapses**: test MAE {base_test:.3f}, Pearson r=0.286
-  (vs 0.92 for the others), pred std 3.09 vs gt 17.67 — model is essentially
-  predicting the training-set mean for all faces.
-- **Recipe difference is decisive**: switching from the default
-  fine-tune recipe to LLRD + warmup + 50 ep moves ViT's test MAE from
-  {base_test:.2f} down to {vit_test:.2f}, an improvement of
+- **DenseNet vs ViT (new) is essentially a tie**:
+  MAE {vit_test:.3f} vs {dn_test:.3f} (gap {gap_vs_dn:+.3f}), RMSE essentially
+  identical (6.943 each). Within single-seed noise. The earlier "ViT slightly
+  wins" framing at 50 vs 25-epoch budget was confounded by the asymmetry.
+- **ViT (baseline) at 50 epochs is NOT collapsed**: test MAE
+  {base_test:.3f}, Pearson r=0.696 (vs 0.92 for the other two), pred std
+  11.54 (vs gt 17.67). Going from 25 to 50 epochs let it escape the
+  mean-predictor local optimum (25ep had r=0.286, pred_std=3.09, MAE 13.01)
+  — but it remains substantially worse than the new-recipe ViT.
+- **Recipe contribution, at equal budget**: switching ViT-B/16 from the
+  default recipe to LLRD + warmup (both at 50 ep) drops test MAE from
+  {base_test:.2f} down to {vit_test:.2f} — an improvement of
   {gap_vs_base:.2f} years (factor ~{base_test/vit_test:.2f}× lower error).
+  See `budget_ablation.csv` for the orthogonal "budget contribution".
 
 ## Shared experimental controls (fairness)
 
-Both ViT runs and DenseNet share: seed=42, APPA-REAL official splits
+All three runs share: seed=42, APPA-REAL official splits
 (train=4113, valid=1500, test=1978), the same `AppaRealDataset` with the
 same train aug (Resize→RandomCrop→HFlip→ColorJitter→ToTensor→ImageNet-normalize)
-and val/test transform, the same L1 loss, the same MAE/RMSE evaluation, and
+and val/test transform, the same L1 loss, the same MAE/RMSE evaluation,
 the **same `run_training()` function** in `src/train.py` (no
-`if model_name == "vit"` branching). Per-model differences (optimizer,
-lr, scheduler, weight_decay, batch_size, epochs, LLRD) are entirely in the
-YAML configs.
+`if model_name == "vit"` branching), and **the same 50-epoch training budget**.
+Per-model differences (optimizer, lr, scheduler, weight_decay, batch_size,
+LLRD) are entirely in the YAML configs.
 """
     (OUT / "comparison_summary.md").write_text(md)
 
@@ -350,6 +356,47 @@ def sanity_check_collapse(data) -> int:
     return len(issues)
 
 
+def write_budget_ablation():
+    """Compare ViT baseline at 25ep vs 50ep, and DenseNet at 25ep vs 50ep,
+    to isolate the budget-only contribution from the recipe contribution.
+
+    Reads `results/{densenet_25ep, vit_baseline_25ep}/` plus the main 50ep
+    results. Skips silently if any of those folders are missing.
+    """
+    rows = []
+    candidates = [
+        ("DenseNet121", "25ep", "densenet_25ep"),
+        ("DenseNet121", "50ep", "densenet"),
+        ("ViT-B/16 (new recipe)", "50ep", "vit"),
+        ("ViT-B/16 (baseline recipe)", "25ep", "vit_baseline_25ep"),
+        ("ViT-B/16 (baseline recipe)", "50ep", "vit_baseline"),
+    ]
+    for label, budget, sub in candidates:
+        d = RES / sub
+        if not d.is_dir():
+            print(f"  [budget-ablation] skip: {sub} missing")
+            continue
+        pred = np.load(d / "test_predictions.npy")
+        gt = np.load(d / "test_ground_truth.npy")
+        s = {}
+        for line in (d / "test_summary.txt").read_text().splitlines():
+            if ":" in line:
+                k, v = line.split(":", 1)
+                s[k.strip()] = v.strip()
+        rows.append({
+            "model": label,
+            "budget": budget,
+            "best_epoch": int(s["best_epoch"]),
+            "test_mae": float(s["test_mae"]),
+            "test_rmse": float(s["test_rmse"]),
+            "pred_std": float(pred.std()),
+            "pearson_r": float(np.corrcoef(pred, gt)[0, 1]),
+        })
+    df = pd.DataFrame(rows)
+    df.to_csv(OUT / "budget_ablation.csv", index=False)
+    return df
+
+
 def main():
     data = load_all()
     plot_mae_curves(data)
@@ -359,8 +406,12 @@ def main():
     plot_pred_distribution(data)
     table = write_table(data)
     write_markdown_summary(data, table)
-    print("=== comparison_table.csv ===")
+    budget = write_budget_ablation()
+    print("=== comparison_table.csv (50ep, 3 runs) ===")
     print(table.to_string(index=False))
+    print()
+    print("=== budget_ablation.csv (recipe × budget) ===")
+    print(budget.to_string(index=False))
     sanity_check_collapse(data)
     print()
     print(f"All artifacts saved under {OUT}")
