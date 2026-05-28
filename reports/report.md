@@ -331,7 +331,10 @@ val_mae 曲线更直接地呈现三种轨迹：DenseNet 在 epoch 31 取得 best
 4.098；ViT (new) 在 epoch 37 取得 best 4.127；ViT (baseline) 在 epoch 45
 取得 best 7.629 —— 前两条曲线在 epoch 20 之后就已经压在 4.1-4.3 的
 低位窄带里，而 baseline 直到 epoch 25 才开始明显下降，到 epoch 45 才
-跌至 7.6 附近。
+跌至 7.6 附近。**图中三个彩色圆点标记的就是每个模型按 val MAE 选出的
+best epoch，对应保存的 `<model>_best.pth` 即为 §9.1 表中 test 指标所用
+的 checkpoint**（非 last epoch；见 `main.py:115` 与
+`src/train.py:run_training` 的 best-ckpt 保存逻辑）。
 
 ### 9.3 预测 vs. 真值散点
 
