@@ -1,0 +1,16 @@
+timestamp: 2026-05-28 11:09:19
+python: 3.12.3
+executable: /root/miniconda3/bin/python
+cmdline: main.py --model vit --mode all --data_root /root/autodl-tmp/data/appa-real-release --out_dir /root/autodl-tmp/work/results --ckpt_dir /root/autodl-tmp/work/checkpoints --seed 42
+cwd: /root/CV-Course-Age-Estimation
+torch: 2.5.1+cu124
+torch.cuda.is_available: True
+torch.version.cuda: 12.4
+cudnn: 90100
+gpu_count: 1
+gpu[0]: NVIDIA A800 80GB PCIe
+git_rev: d813d2bb7f6948c54fd190cdb1ecf32b46d1661e
+git_dirty: no
+model: vit
+mode: all
+config_path: configs/vit.yaml

@@ -1,0 +1,7 @@
+model: vit_baseline
+ckpt: /root/autodl-tmp/work/checkpoints/vit_baseline_best.pth
+best_epoch: 65
+test_loss: 11.956605
+test_mae: 11.956605
+test_rmse: 16.298688
+n_test: 1978

@@ -367,10 +367,13 @@ def write_budget_ablation():
     rows = []
     candidates = [
         ("DenseNet121", "25ep", "densenet_25ep"),
-        ("DenseNet121", "50ep", "densenet"),
-        ("ViT-B/16 (new recipe)", "50ep", "vit"),
+        ("DenseNet121", "50ep (canonical)", "densenet"),
+        ("DenseNet121", "100ep", "densenet_100ep"),
+        ("ViT-B/16 (new recipe)", "50ep (canonical)", "vit"),
+        ("ViT-B/16 (new recipe)", "100ep", "vit_100ep"),
         ("ViT-B/16 (baseline recipe)", "25ep", "vit_baseline_25ep"),
-        ("ViT-B/16 (baseline recipe)", "50ep", "vit_baseline"),
+        ("ViT-B/16 (baseline recipe)", "50ep (canonical)", "vit_baseline"),
+        ("ViT-B/16 (baseline recipe)", "100ep", "vit_baseline_100ep"),
     ]
     for label, budget, sub in candidates:
         d = RES / sub

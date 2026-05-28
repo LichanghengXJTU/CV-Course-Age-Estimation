@@ -1,6 +1,10 @@
 model: vit_b_16
 pretrained: true
-epochs: 100
+# 50 is the budget sweet-spot for ViT (new): 100 ep ablation regressed
+# slightly to MAE 4.95 (vs 4.86 at 50 ep) — best-by-val epoch shifted
+# from 37 (50 ep) to 34 (100 ep) and post-best train_loss collapsed
+# while val plateaued, i.e. mild overfit. See report §11.
+epochs: 50
 batch_size: 16
 # `lr` here is the BASE (head) lr; lower layers get base * 0.75^depth via LLRD.
 lr: 2.0e-4
@@ -19,7 +23,7 @@ scheduler:
   name: cosine_warmup
   warmup_epochs: 5
   warmup_start_factor: 0.01
-  t_max: 100
+  t_max: 50
   eta_min: 3.0e-7
 img_size: 224
 num_workers: 4

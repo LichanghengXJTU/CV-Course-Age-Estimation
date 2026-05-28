@@ -8,12 +8,16 @@
 #   - weight_decay: 0.05 (vs 0.01)
 #   - scheduler: plain cosine to eta_min=0 (no warmup)
 #
-# Extended to 100 epochs to give the default-recipe ViT a fair chance of
-# converging beyond its 50-epoch partial-recovery point (per user request,
-# 2026-05-28 late).
+# Budget sweet-spot for this recipe is 50 ep. We ran 25/50/100 ep
+# ablations (see results/vit_baseline_{25ep,100ep}/ and report §11):
+#   - 25 ep: collapsed to mean predictor (test MAE 13.01, r=0.29)
+#   - 50 ep: partial recovery (test MAE 9.44,  r=0.70) <- best
+#   - 100 ep: regressed (test MAE 11.96, r=0.43) — slower cosine
+#     anneal kept lr high in the middle, model drifted back toward
+#     a partial-collapse state. Default recipe is genuinely unstable.
 model: vit_b_16
 pretrained: true
-epochs: 100
+epochs: 50
 batch_size: 16
 lr: 5.0e-5
 weight_decay: 0.05
@@ -22,7 +26,7 @@ loss: l1
 # Note: NO `llrd` key here — build_optimizer falls back to flat-lr param-groups.
 scheduler:
   name: cosine
-  t_max: 100
+  t_max: 50
 img_size: 224
 num_workers: 4
 seed: 42

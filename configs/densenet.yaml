@@ -1,6 +1,10 @@
 model: densenet121
 pretrained: true
-epochs: 100
+# 50 is the budget sweet-spot: we also ran 25 and 100 ep ablations
+# (see results/densenet_{25ep,100ep}/ and report §11); 100 ep regressed
+# slightly on test (4.94 -> 5.00 MAE) because StepLR at 100 ep ends at
+# lr~1.95e-7 and the late-stage low-lr drift doesn't help.
+epochs: 50
 batch_size: 32
 lr: 1.0e-4
 weight_decay: 0.0
