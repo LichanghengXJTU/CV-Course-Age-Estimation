@@ -21,10 +21,11 @@
 报告共涉及**八次训练运行**：三个模型 × 三档训练 budget（25 / 50 / 100 epoch）
 共 9 cell 中的 8 个 —— DenseNet121 与 ViT-B/16 默认配方 baseline 各跑了
 25 / 50 / 100 ep 共 3 档；ViT-B/16 新配方跑了 50 / 100 ep 共 2 档（缺失
-ViT (new) 25 ep cell，详见 §12.2 limitation）。其中 **50 ep 为 canonical
-主对比 budget**，三次主对比运行（DenseNet 50 ep、ViT new 50 ep、ViT baseline
-50 ep）的主结论保留在 §9-§10；另外 5 次 25 / 100 ep 运行作为 budget
-ablation 在 §11 集中讨论。所有结论与数字均来自
+ViT (new) 25 ep cell，即 `3×3 − 1 = 8`，详见 §12.2 limitation）。其中
+**50 ep 为 canonical 主对比 budget**，三次主对比运行（DenseNet 50 ep、
+ViT new 50 ep、ViT baseline 50 ep）的主结论保留在 §9-§10；另外 5 次
+非-canonical 数据点（3×25ep + 3×100ep − ViT (new) 25ep）作为 budget
+ablation 在 §11 集中讨论，与三次主对比共同构成 §11.1 的 8-row 表。所有结论与数字均来自
 `results/{densenet, vit, vit_baseline, densenet_25ep, vit_baseline_25ep,
 densenet_100ep, vit_100ep, vit_baseline_100ep}/` 与 `results/comparison/`
 目录下的日志文件，不做事后估计。
@@ -642,7 +643,8 @@ wd=0.05 持续把 head 压向零，再次把已经学到的「年龄区分性」
 
 1. 本实验在 APPA-REAL 上完成了 DenseNet121 与 ViT-B/16 的年龄估计回归任务，
    并通过统一的训练循环 + 受控差异 YAML 实现了三次主对比运行（全部 50 ep）
-   的公平对比，外加 5 行 budget × recipe ablation 数据。
+   的公平对比，外加 5 个非-canonical 数据点（3×25ep + 3×100ep − ViT (new)
+   25ep）共同构成 §11.1 的 8-row budget × recipe ablation 表。
 2. **在同 50-epoch budget 下，DenseNet 与 ViT (new) 实质打平**：test MAE
    4.941 vs 4.861（差 0.080，单 seed 噪声范围内），test RMSE 均为 6.943
    （完全打平到小数点后 3 位），Pearson r 0.925 vs 0.924。早期报告中
