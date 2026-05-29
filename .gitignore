@@ -14,12 +14,14 @@ data/*
 # Model weights not in git
 checkpoints/*.pth
 checkpoints/*.pt
+checkpoints_notebook/
 !checkpoints/.gitkeep
 
 # Result artifacts (large) not in git, but keep dir
 results/*.png
 results/*.jpg
 results/*.npy
+results/notebook_run/
 !results/.gitkeep
 
 # Logs
