@@ -1,0 +1,7 @@
+model: densenet
+ckpt: checkpoints_smoke\densenet_best.pth
+best_epoch: 1
+test_loss: 9.526290
+test_mae: 9.526289
+test_rmse: 13.792280
+n_test: 1978

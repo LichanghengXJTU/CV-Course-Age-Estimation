@@ -1,0 +1,12 @@
+timestamp: 2026-05-28 22:32:56
+python: 3.10.20
+executable: D:\Miniforge3\envs\cv-age\python.exe
+cmdline: main.py --model densenet --mode all --epochs 1 --batch_size 4 --data_root data/appa-real-release --out_dir results/smoke --ckpt_dir checkpoints_smoke
+cwd: E:\06-ZYZ-CV\0-CV Experiment
+torch: 2.12.0+cpu
+torch.cuda.is_available: False
+git_rev: f36b836c6e927bf527c2143b77fa81ead8426d08
+git_dirty: yes
+model: densenet
+mode: all
+config_path: configs\densenet.yaml
